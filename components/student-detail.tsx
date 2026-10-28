@@ -1,27 +1,45 @@
 // components/student-detail.tsx
- 
-import { StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Student } from "../data/students";
- 
+import { useStudents } from "@/context/students-context";
+
 interface StudentDetailProps {
   student: Student;
 }
- 
+
 export default function StudentDetail({ student }: StudentDetailProps) {
+  const { dispatch } = useStudents();
+  const handleRemove = () => {
+    Alert.alert(
+      "Remove Student",
+      `Remove ${student.name} from the directory?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            dispatch({ type: "REMOVE_STUDENT", payload: student.id });
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.card}>
- 
       {/* Header row: name + department */}
       <Text style={styles.name}>{student.name}</Text>
       <Text style={styles.department}>{student.department}</Text>
       <Text style={styles.idBadge}>ID: {student.studentId}</Text>
- 
+
       <View style={styles.divider} />
- 
+
       {/* Bio */}
       <Text style={styles.sectionLabel}>About</Text>
       <Text style={styles.bio}>{student.bio}</Text>
- 
+
       {/* Skills */}
       <Text style={styles.sectionLabel}>Skills</Text>
       <View style={styles.skillsRow}>
@@ -31,11 +49,14 @@ export default function StudentDetail({ student }: StudentDetailProps) {
           </View>
         ))}
       </View>
- 
+
+      <Pressable style={styles.removeButton} onPress={handleRemove}>
+        <Text style={styles.removeText}>Remove from Directory</Text>
+      </Pressable>
     </View>
   );
 }
- 
+
 const styles = StyleSheet.create({
   card: {
     margin: 12,
@@ -106,5 +127,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#1D4ED8",
     fontWeight: "500",
+  },
+  removeButton: {
+    marginTop: 16,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#EF4444",
+  },
+  removeText: {
+    color: "#EF4444",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

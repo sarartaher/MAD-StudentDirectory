@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -7,13 +6,11 @@ import {
   StyleSheet,
   Text,
 } from "react-native";
+import { router } from "expo-router";
+import { useStudents } from "../context/students-context";
 
 import FormField from "./form-field";
 import { Student } from "../data/students";
-
-interface AddStudentFormProps {
-  onSubmitSuccess: (student: Student) => void;
-}
 
 interface FormData {
   name: string;
@@ -53,9 +50,8 @@ function validateForm(data: FormData): FormErrors {
   return newErrors;
 }
 
-export default function AddStudentForm({
-  onSubmitSuccess,
-}: AddStudentFormProps) {
+export default function AddStudentForm() {
+  const { dispatch } = useStudents();
   // Form state
   const [formData, setFormData] = useState<FormData>({
     name: "",
@@ -92,9 +88,7 @@ export default function AddStudentForm({
 
   // Show errors after blur or a submit attempt
   const getFieldError = (field: keyof FormErrors) => {
-    return touched[field] || submitAttempted
-      ? errors[field]
-      : undefined;
+    return touched[field] || submitAttempted ? errors[field] : undefined;
   };
 
   // Validate whenever form data changes
@@ -140,14 +134,14 @@ export default function AddStudentForm({
           .split(",")
           .map((skill) => skill.trim())
           .filter((skill) => skill.length > 0),
-        avatarUrl:
-          "https://i.pravatar.cc/150?u=" + Date.now(),
+        avatarUrl: "https://i.pravatar.cc/150?u=" + Date.now(),
       };
 
       setIsSubmitting(false);
       setSubmitTrigger(false);
 
-      onSubmitSuccess(newStudent);
+      dispatch({ type: "ADD_STUDENT", payload: newStudent });
+      router.back();
 
       // Reset form after successful submission
       setFormData({
@@ -178,8 +172,7 @@ export default function AddStudentForm({
       <Text style={styles.heading}>Add New Student</Text>
 
       <Text style={styles.description}>
-        Enter the student's information to add them
-        to the directory.
+        Enter the student's information to add them to the directory.
       </Text>
 
       <FormField
@@ -194,9 +187,7 @@ export default function AddStudentForm({
       <FormField
         label="Student ID"
         value={formData.studentId}
-        onChangeText={(text) =>
-          updateField("studentId", text)
-        }
+        onChangeText={(text) => updateField("studentId", text)}
         onBlur={() => markTouched("studentId")}
         placeholder="Enter student ID"
         autoCapitalize="characters"
@@ -206,9 +197,7 @@ export default function AddStudentForm({
       <FormField
         label="Department"
         value={formData.department}
-        onChangeText={(text) =>
-          updateField("department", text)
-        }
+        onChangeText={(text) => updateField("department", text)}
         onBlur={() => markTouched("department")}
         placeholder="e.g. Computer Science"
         error={getFieldError("department")}
@@ -227,32 +216,23 @@ export default function AddStudentForm({
       <FormField
         label="Skills (optional)"
         value={formData.skillsText}
-        onChangeText={(text) =>
-          updateField("skillsText", text)
-        }
+        onChangeText={(text) => updateField("skillsText", text)}
         onBlur={() => markTouched("skillsText")}
         placeholder="e.g. React Native, JavaScript, Python"
       />
 
-      <Text style={styles.helperText}>
-        Separate skills with commas.
-      </Text>
+      <Text style={styles.helperText}>Separate skills with commas.</Text>
 
       {/* Submit Button */}
       <Pressable
-        style={[
-          styles.button,
-          !isFormValid && styles.buttonDisabled,
-        ]}
+        style={[styles.button, !isFormValid && styles.buttonDisabled]}
         onPress={handleSubmitPress}
         disabled={!isFormValid || isSubmitting}
       >
         {isSubmitting ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.buttonText}>
-            Join Directory
-          </Text>
+          <Text style={styles.buttonText}>Join Directory</Text>
         )}
       </Pressable>
     </ScrollView>
