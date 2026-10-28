@@ -1,4 +1,7 @@
-import React, { useEffect, useState } from "react";
+// components/add-student-form.tsx
+
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -6,11 +9,9 @@ import {
   StyleSheet,
   Text,
 } from "react-native";
-import { router } from "expo-router";
 import { useStudents } from "../context/students-context";
-
-import FormField from "./form-field";
 import { Student } from "../data/students";
+import FormField from "./form-field";
 
 interface FormData {
   name: string;
@@ -27,32 +28,40 @@ interface FormErrors {
   bio?: string;
 }
 
-// Validate form data
-function validateForm(data: FormData): FormErrors {
+function validateForm(data: FormData, students: Student[]): FormErrors {
   const newErrors: FormErrors = {};
 
-  if (!data.name.trim()) {
-    newErrors.name = "Full name is required.";
+  if (data.name.trim().length === 0) {
+    newErrors.name = "Name is required.";
+  } else if (data.name.trim().length < 3) {
+    newErrors.name = "Name must be at least 3 characters.";
   }
 
-  if (!data.studentId.trim()) {
+  const idPattern = /^\d{2}-\d{5}-\d$/;
+  if (data.studentId.trim().length === 0) {
     newErrors.studentId = "Student ID is required.";
+  } else if (!idPattern.test(data.studentId.trim())) {
+    newErrors.studentId = "Format must be NN-NNNNN-N (e.g. 22-12345-1).";
+  } else if (students.some((s) => s.studentId === data.studentId.trim())) {
+    newErrors.studentId = "Student ID already exists";
   }
 
-  if (!data.department.trim()) {
+  if (data.department.trim().length === 0) {
     newErrors.department = "Department is required.";
   }
 
-  if (!data.bio.trim()) {
+  if (data.bio.trim().length === 0) {
     newErrors.bio = "Bio is required.";
+  } else if (data.bio.trim().length < 10) {
+    newErrors.bio = "Bio must be at least 10 characters.";
   }
 
   return newErrors;
 }
 
 export default function AddStudentForm() {
-  const { dispatch } = useStudents();
-  // Form state
+  const { students, dispatch } = useStudents();
+
   const [formData, setFormData] = useState<FormData>({
     name: "",
     studentId: "",
@@ -60,66 +69,51 @@ export default function AddStudentForm() {
     bio: "",
     skillsText: "",
   });
-
-  // Validation state
   const [errors, setErrors] = useState<FormErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitTrigger, setSubmitTrigger] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  // Submission state
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitTrigger, setSubmitTrigger] = useState(false);
-
-  // Update a field
   const updateField = (field: keyof FormData, value: string) => {
-    setFormData((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Mark a field as touched
-  const markTouched = (field: string) => {
-    setTouched((previous) => ({
-      ...previous,
-      [field]: true,
-    }));
+  const markTouched = (field: keyof FormData) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  // Show errors after blur or a submit attempt
   const getFieldError = (field: keyof FormErrors) => {
     return touched[field] || submitAttempted ? errors[field] : undefined;
   };
 
-  // Validate whenever form data changes
+  // Re-validate on every change (also when the students list changes)
   useEffect(() => {
-    setErrors(validateForm(formData));
-  }, [formData]);
+    setErrors(validateForm(formData, students));
+  }, [formData, students]);
 
-  // Check whether all required fields are valid
   const isFormValid =
-    formData.name.trim().length > 0 &&
-    formData.studentId.trim().length > 0 &&
-    formData.department.trim().length > 0 &&
-    formData.bio.trim().length > 0 &&
-    Object.keys(errors).length === 0;
+    Object.keys(errors).length === 0 &&
+    formData.name.length > 0 &&
+    formData.studentId.length > 0;
 
-  // Handle Submit button press
   const handleSubmitPress = () => {
+    setTouched((prev) => ({
+      ...prev,
+      name: true,
+      studentId: true,
+      department: true,
+      bio: true,
+    }));
     setSubmitAttempted(true);
 
-    const validationErrors = validateForm(formData);
-    setErrors(validationErrors);
-
-    if (Object.keys(validationErrors).length > 0) {
-      return;
+    if (isFormValid) {
+      setIsSubmitting(true);
+      setSubmitTrigger(true);
     }
-
-    setIsSubmitting(true);
-    setSubmitTrigger(true);
   };
 
-  // Submit effect: simulate a network request
+  // Fake network request, cancelled if the screen closes
   useEffect(() => {
     if (!submitTrigger) return;
 
@@ -132,47 +126,27 @@ export default function AddStudentForm() {
         bio: formData.bio.trim(),
         skills: formData.skillsText
           .split(",")
-          .map((skill) => skill.trim())
-          .filter((skill) => skill.length > 0),
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0),
         avatarUrl: "https://i.pravatar.cc/150?u=" + Date.now(),
       };
 
       setIsSubmitting(false);
       setSubmitTrigger(false);
-
       dispatch({ type: "ADD_STUDENT", payload: newStudent });
       router.back();
-
-      // Reset form after successful submission
-      setFormData({
-        name: "",
-        studentId: "",
-        department: "",
-        bio: "",
-        skillsText: "",
-      });
-
-      setErrors({});
-      setTouched({});
-      setSubmitAttempted(false);
     }, 1500);
 
-    // Clean up the timeout if the component unmounts
     return () => {
       clearTimeout(timeoutId);
     };
   }, [submitTrigger]);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text style={styles.heading}>Add New Student</Text>
-
-      <Text style={styles.description}>
-        Enter the student's information to add them to the directory.
+    <ScrollView style={styles.container}>
+      <Text style={styles.heading}>Join the Directory</Text>
+      <Text style={styles.subheading}>
+        Fill in your details below to add yourself to StudentDirectory.
       </Text>
 
       <FormField
@@ -180,7 +154,7 @@ export default function AddStudentForm() {
         value={formData.name}
         onChangeText={(text) => updateField("name", text)}
         onBlur={() => markTouched("name")}
-        placeholder="Enter full name"
+        placeholder="e.g. Ashraful Haque"
         error={getFieldError("name")}
       />
 
@@ -189,8 +163,8 @@ export default function AddStudentForm() {
         value={formData.studentId}
         onChangeText={(text) => updateField("studentId", text)}
         onBlur={() => markTouched("studentId")}
-        placeholder="Enter student ID"
-        autoCapitalize="characters"
+        placeholder="e.g. 22-12345-1"
+        autoCapitalize="none"
         error={getFieldError("studentId")}
       />
 
@@ -208,22 +182,20 @@ export default function AddStudentForm() {
         value={formData.bio}
         onChangeText={(text) => updateField("bio", text)}
         onBlur={() => markTouched("bio")}
-        placeholder="Write a short bio"
+        placeholder="A short sentence about yourself..."
         multiline
         error={getFieldError("bio")}
       />
 
       <FormField
-        label="Skills (optional)"
+        label="Skills (comma-separated)"
         value={formData.skillsText}
         onChangeText={(text) => updateField("skillsText", text)}
         onBlur={() => markTouched("skillsText")}
-        placeholder="e.g. React Native, JavaScript, Python"
+        placeholder="e.g. React Native, TypeScript, Figma"
+        autoCapitalize="none"
       />
 
-      <Text style={styles.helperText}>Separate skills with commas.</Text>
-
-      {/* Submit Button */}
       <Pressable
         style={[styles.button, !isFormValid && styles.buttonDisabled]}
         onPress={handleSubmitPress}
@@ -240,30 +212,18 @@ export default function AddStudentForm() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 32,
-  },
+  container: { flex: 1, backgroundColor: "#FFFFFF", padding: 20 },
   heading: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 6,
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0D1F4E",
+    marginBottom: 4,
   },
-  description: {
+  subheading: {
     fontSize: 13,
     color: "#64748B",
     marginBottom: 24,
     lineHeight: 19,
-  },
-  helperText: {
-    fontSize: 11,
-    color: "#64748B",
-    marginTop: -10,
-    marginBottom: 20,
   },
   button: {
     backgroundColor: "#0D9488",
@@ -273,12 +233,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 32,
   },
-  buttonDisabled: {
-    backgroundColor: "#CBD5E1",
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
-  },
+  buttonDisabled: { backgroundColor: "#CBD5E1" },
+  buttonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
 });
